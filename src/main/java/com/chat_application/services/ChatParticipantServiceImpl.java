@@ -6,10 +6,12 @@ import com.chat_application.entity.ChatParticipant;
 import com.chat_application.entity.User;
 import com.chat_application.entity.enums.ChatRole;
 import com.chat_application.entity.enums.ChatType;
+import com.chat_application.entity.enums.FriendStatus;
 import com.chat_application.exception.ResourceNotFoundException;
 import com.chat_application.exception.UnAuthorisedException;
 import com.chat_application.repositories.ChatParticipantRepository;
 import com.chat_application.repositories.ChatRepository;
+import com.chat_application.repositories.FriendshipRepository;
 import com.chat_application.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +34,7 @@ public class ChatParticipantServiceImpl implements ChatParticipantService {
     private final ModelMapper modelMapper;
     private final UserRepository userRepository;
     private final ChatParticipantRepository chatParticipantRepository;
+    private final FriendshipRepository friendshipRepository ;
 
     @Transactional
     @Override
@@ -54,6 +57,15 @@ public class ChatParticipantServiceImpl implements ChatParticipantService {
 
         if (checkParticipant(chatId, userToAdd.getId())) {
             throw new IllegalStateException("User with id: " + userToAdd.getId() + " is already a participant in chat " + chatId);
+        }
+
+        boolean areFriends = friendshipRepository.findByUser1AndUser2(currentUser, userToAdd)
+                .or(() -> friendshipRepository.findByUser1AndUser2(userToAdd, currentUser))
+                .map(friendship -> friendship.getStatus() == FriendStatus.ACCEPTED)
+                .orElse(false);
+
+        if (!areFriends) {
+            throw new UnAuthorisedException("You can only add users who are your friends.");
         }
 
         ChatParticipant newParticipant = ChatParticipant.builder()
