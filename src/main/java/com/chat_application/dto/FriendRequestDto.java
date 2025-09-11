@@ -1,5 +1,6 @@
 package com.chat_application.dto;
 
+import com.chat_application.entity.User;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

@@ -68,7 +68,7 @@ public class ChatServiceImpl implements ChatService{
     public List<ChatSummaryDto> getChatByName(String name) {
         log.info("Fetching chats by name: {}", name);
         User user = getCurrentUser() ;
-        List<Chat> chats = chatRepository.findByChatName(name) ;
+        List<Chat> chats = chatRepository.findByName(name) ;
         List<Chat> filterChats = chats
                 .stream()
                 .filter(
@@ -96,7 +96,7 @@ public class ChatServiceImpl implements ChatService{
         User currentUser = getCurrentUser();
         User user = getCurrentUser() ;
         Pageable pageable = PageRequest.of(size,page) ;
-        Page<Chat> chatPage = chatRepository.findByParticipantsUserId(user) ;
+        Page<Chat> chatPage = chatRepository.findByParticipantsUserId(user,pageable) ;
         return chatPage.map(chat -> {
             ChatSummaryDto chatSummaryDto = modelMapper.map(chat,ChatSummaryDto.class);
             chatSummaryDto.setParticipantCount(chat.getParticipants().size());

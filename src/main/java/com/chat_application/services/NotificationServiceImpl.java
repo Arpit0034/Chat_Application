@@ -17,6 +17,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,7 @@ public class NotificationServiceImpl implements NotificationService{
     private final ChatRepository chatRepository ;
     private final NotificationRepository notificationRepository ;
     private final MessageRepository messageReadRepository ;
+    private final SimpMessagingTemplate simpMessagingTemplate ;
 
     @Transactional
     @Override
@@ -49,7 +51,9 @@ public class NotificationServiceImpl implements NotificationService{
                 .type(type)
                 .build() ;
         notificationRepository.save(notification) ;
-        return modelMapper.map(notification,NotificationDto.class) ;
+        NotificationDto notificationDto = modelMapper.map(notification,NotificationDto.class) ;
+        simpMessagingTemplate.convertAndSend("/topic/chat/" + chatId + "/notifications",notificationDto);
+        return notificationDto ;
     }
 
     @Override

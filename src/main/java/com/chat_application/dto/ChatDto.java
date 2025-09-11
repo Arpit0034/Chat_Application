@@ -15,7 +15,7 @@ import java.util.List;
 @Builder
 public class ChatDto {
     private Long id;
-    private ChatType type;
+    private ChatType chatType;
     private String name;
     private LocalDateTime createdAt;
     private List<ChatParticipantDto> participants;

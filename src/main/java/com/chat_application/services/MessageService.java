@@ -10,5 +10,4 @@ public interface MessageService {
     public void deleteMessageForMe(Long messageId) ;
     public void deleteMessageForEveryone(Long messageId) ;
     void deleteAllMessages(Long chatId);
-    MessageDto broadcastMessage(MessageCreateRequestDto requestDto, Long senderId);
 }

@@ -14,6 +14,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,13 +28,14 @@ import static com.chat_application.util.AppUtils.getCurrentUser;
 
 @Service
 @RequiredArgsConstructor
-public class MessageServiceImpl implements MessageService{
+public class MessageServiceImpl implements MessageService {
 
-    private final ModelMapper modelMapper ;
-    private final MessageRepository messageRepository ;
-    private final ChatRepository chatRepository ;
-    private final AttachmentRepository attachmentRepository ;
-    private final MessageReadRepository messageReadRepository ;
+    private final ModelMapper modelMapper;
+    private final MessageRepository messageRepository;
+    private final ChatRepository chatRepository;
+    private final AttachmentRepository attachmentRepository;
+    private final MessageReadRepository messageReadRepository;
+    private final SimpMessagingTemplate simpMessagingTemplate;
 
     @Transactional
     @Override
@@ -55,13 +57,15 @@ public class MessageServiceImpl implements MessageService{
             List<Attachment> attachments = dto.getAttachments()
                     .stream()
                     .map(attDto -> modelMapper.map(attDto, Attachment.class))
-                    .collect(Collectors.toList());
+                    .toList();
             message.setAttachments(attachments);
             attachments.forEach(att -> att.setMessage(message));
         }
 
         Message savedMessage = messageRepository.save(message);
-        return modelMapper.map(savedMessage, MessageSummaryDto.class);
+        MessageSummaryDto messageSummaryDto = modelMapper.map(savedMessage,MessageSummaryDto.class) ;
+        simpMessagingTemplate.convertAndSend("/topic/chat/"+chat.getId(),messageSummaryDto);
+        return messageSummaryDto ;
     }
 
     @Override
@@ -137,10 +141,5 @@ public class MessageServiceImpl implements MessageService{
         }
 
         messageRepository.saveAll(messages);
-    }
-
-    @Override
-    public MessageDto broadcastMessage(MessageCreateRequestDto requestDto, Long senderId) {
-        return null;
     }
 }

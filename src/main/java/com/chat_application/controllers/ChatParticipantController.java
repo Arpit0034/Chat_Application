@@ -38,7 +38,7 @@ public class ChatParticipantController {
         return ResponseEntity.ok().body(chatParticipantService.isUserParticipant(chatId,userId)) ;
     }
 
-    @GetMapping("/isUserParticipant/{chatId}/{userId}")
+    @GetMapping("/isUserAdmin/{chatId}/{userId}")
     public ResponseEntity<Boolean> isUserAdmin(@PathVariable @Positive Long chatId ,@PathVariable @Positive Long userId){
         return ResponseEntity.ok().body(chatParticipantService.isUserAdmin(chatId,userId)) ;
     }

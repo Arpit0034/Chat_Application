@@ -5,6 +5,7 @@ import com.chat_application.dto.AttachmentDto;
 import com.chat_application.dto.MessageCreateRequestDto;
 import com.chat_application.dto.MessageSummaryDto;
 import com.chat_application.services.MessageService;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,7 +20,7 @@ public class MessageController {
     private final MessageService messageService ;
 
     @PostMapping("/createMessage")
-    public ResponseEntity<MessageSummaryDto> createMessage(@RequestBody MessageCreateRequestDto messageCreateRequestDto){
+    public ResponseEntity<MessageSummaryDto> createMessage(@Valid @RequestBody MessageCreateRequestDto messageCreateRequestDto){
         return new ResponseEntity<>(messageService.createMessage(messageCreateRequestDto), HttpStatus.CREATED) ;
     }
 

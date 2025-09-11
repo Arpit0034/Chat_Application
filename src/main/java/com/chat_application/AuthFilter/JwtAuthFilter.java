@@ -24,6 +24,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Configuration
 public class JwtAuthFilter extends OncePerRequestFilter {
+
     private final JwtService jwtService ;
     private final UserService userService ;
     private  final HandlerExceptionResolver handlerExceptionResolver ;

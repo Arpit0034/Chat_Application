@@ -62,7 +62,7 @@ public class FriendshipServiceImpl implements FriendshipService{
         Friendship savedFriendship = friendshipRepository.save(friendship);
         log.info("Friend request sent from user {} to user {}", user.getId(), friendId);
 
-        return modelMapper.map(savedFriendship, FriendRequestDto.class);
+        return FriendRequestDto.builder().user2(savedFriendship.getUser2().getId()).build();
     }
 
     @Override

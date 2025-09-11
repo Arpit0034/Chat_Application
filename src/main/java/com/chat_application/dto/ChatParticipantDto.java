@@ -16,7 +16,7 @@ import java.util.List;
 public class ChatParticipantDto {
     private Long id;
     private UserSummaryDto user;
-    private ChatRole chatRoles;
+    private ChatRole chatRole;
     private LocalDateTime joinedAt;
     private LocalDateTime leftAt;
 }
