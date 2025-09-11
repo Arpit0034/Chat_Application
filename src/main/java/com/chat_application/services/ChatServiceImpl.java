@@ -9,6 +9,7 @@ import com.chat_application.entity.User;
 import com.chat_application.entity.enums.ChatRole;
 import com.chat_application.entity.enums.ChatType;
 import com.chat_application.exception.ResourceNotFoundException;
+import com.chat_application.exception.UnAuthorisedException;
 import com.chat_application.repositories.ChatRepository;
 import com.chat_application.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,10 @@ public class ChatServiceImpl implements ChatService{
     @Override
     public ChatDto createChat(ChatCreateRequestDto chatCreateRequestDto) {
         log.info("Creating new chat with name: {}", chatCreateRequestDto.getName());
+        User user = getCurrentUser() ;
+        if(chatCreateRequestDto.getType().equals(ChatType.ONE_TO_ONE) && chatCreateRequestDto.getParticipantIds().size() > 1){
+            throw new UnAuthorisedException("Can't add more than 2 participants in chat of type ONE_TO_ONE") ;
+        }
         Chat chat = Chat.builder()
                 .name(chatCreateRequestDto.getName())
                 .type(chatCreateRequestDto.getType())
@@ -53,11 +58,19 @@ public class ChatServiceImpl implements ChatService{
                             .builder()
                             .joinedAt(LocalDateTime.now())
                             .chat(finalChat)
-                            .chatRole(chatCreateRequestDto.getType() == ChatType.ONE_TO_ONE ? ChatRole.MEMBER : ChatRole.ADMIN)
+                            .chatRole(chatCreateRequestDto.getType() == ChatType.ONE_TO_ONE ? ChatRole.ADMIN : ChatRole.MEMBER)
                             .user(userRepository.findById(ele).orElseThrow(() -> new ResourceNotFoundException("User not found with id : "+ele)))
                             .build();
                 })
                 .collect(Collectors.toList()) ;
+
+        users.add(ChatParticipant
+                .builder()
+                .chatRole(ChatRole.ADMIN)
+                .user(user)
+                .chat(chat)
+                .build()
+        );
         chat.setParticipants(users);
         chat = chatRepository.save(chat) ;
         log.info("Chat created with id: {}", chat.getId());

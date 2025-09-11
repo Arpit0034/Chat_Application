@@ -5,7 +5,9 @@ import com.chat_application.entity.Chat;
 import com.chat_application.entity.ChatParticipant;
 import com.chat_application.entity.User;
 import com.chat_application.entity.enums.ChatRole;
+import com.chat_application.entity.enums.ChatType;
 import com.chat_application.exception.ResourceNotFoundException;
+import com.chat_application.exception.UnAuthorisedException;
 import com.chat_application.repositories.ChatParticipantRepository;
 import com.chat_application.repositories.ChatRepository;
 import com.chat_application.repositories.UserRepository;
@@ -43,6 +45,10 @@ public class ChatParticipantServiceImpl implements ChatParticipantService {
             throw new AccessDeniedException("Only admins can add participants");
         }
 
+        if (chat.getType() == ChatType.ONE_TO_ONE) {
+            throw new UnAuthorisedException("Can't add participants to a ONE_TO_ONE chat");
+        }
+
         User userToAdd = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
@@ -56,7 +62,6 @@ public class ChatParticipantServiceImpl implements ChatParticipantService {
                 .chatRole(ChatRole.MEMBER)
                 .joinedAt(LocalDateTime.now())
                 .build();
-
         chat.getParticipants().add(newParticipant);
         chatRepository.save(chat);
 
@@ -70,6 +75,9 @@ public class ChatParticipantServiceImpl implements ChatParticipantService {
         log.info("User {} removing participant {} from chat {}", currentUser.getId(), userId, chatId);
 
         Chat chat = getById(chatId);
+        if (!chat.getType().equals(ChatType.GROUP)) {
+            throw new UnAuthorisedException("Can't remove participants from non-GROUP chats");
+        }
 
         if (!checkAdmin(chat, currentUser)) {
             throw new AccessDeniedException("Only admins can remove participants");
@@ -86,7 +94,15 @@ public class ChatParticipantServiceImpl implements ChatParticipantService {
                 .filter(p -> p.getUser().getId().equals(userToRemove.getId()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Participant not found"));
+        long countAdmin = chat
+                .getParticipants()
+                .stream()
+                .filter(x -> x.getChatRole() == ChatRole.ADMIN)
+                .count() ;
 
+        if (participantToRemove.getChatRole() == ChatRole.ADMIN && countAdmin <= 1) {
+            throw new UnAuthorisedException("Can't remove the only ADMIN of the chat");
+        }
         chat.getParticipants().remove(participantToRemove);
         chatRepository.save(chat);
 

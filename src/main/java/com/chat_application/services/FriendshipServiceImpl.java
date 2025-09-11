@@ -6,6 +6,7 @@ import com.chat_application.entity.Friendship;
 import com.chat_application.entity.User;
 import com.chat_application.entity.enums.FriendStatus;
 import com.chat_application.exception.ResourceNotFoundException;
+import com.chat_application.exception.UnAuthorisedException;
 import com.chat_application.repositories.FriendshipRepository;
 import com.chat_application.repositories.MessageRepository;
 import com.chat_application.repositories.UserRepository;
@@ -15,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 
+import java.nio.file.AccessDeniedException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -78,7 +80,7 @@ public class FriendshipServiceImpl implements FriendshipService{
                 .orElseThrow(() -> new ResourceNotFoundException("Friend request not found"));
 
         if (friendship.getStatus() != FriendStatus.PENDING) {
-            throw new IllegalStateException("Friend request is not in pending state");
+            throw new UnAuthorisedException("Friend request is not in pending state");
         }
 
         friendship.setStatus(FriendStatus.ACCEPTED);
