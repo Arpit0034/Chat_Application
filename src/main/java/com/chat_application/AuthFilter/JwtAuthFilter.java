@@ -30,14 +30,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private  final HandlerExceptionResolver handlerExceptionResolver ;
 
     @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
-        String path = request.getServletPath();
-        return path.equals("/api/v1/users/login") ||
-                path.equals("/api/v1/users/signup") ||
-                path.equals("/api/v1/users/refresh");
-    }
-
-    @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         log.info("JwtAuthFilter processing: {}", request.getServletPath());
         final String requestTokenHeader = request.getHeader("Authorization");

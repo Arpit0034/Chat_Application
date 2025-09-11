@@ -42,12 +42,12 @@ public class ChatServiceImpl implements ChatService{
     public ChatDto createChat(ChatCreateRequestDto chatCreateRequestDto) {
         log.info("Creating new chat with name: {}", chatCreateRequestDto.getName());
         User user = getCurrentUser() ;
-        if(chatCreateRequestDto.getType().equals(ChatType.ONE_TO_ONE) && chatCreateRequestDto.getParticipantIds().size() > 1){
+        if(chatCreateRequestDto.getChatType().equals(ChatType.ONE_TO_ONE) && chatCreateRequestDto.getParticipantIds().size() > 1){
             throw new UnAuthorisedException("Can't add more than 2 participants in chat of type ONE_TO_ONE") ;
         }
         Chat chat = Chat.builder()
                 .name(chatCreateRequestDto.getName())
-                .type(chatCreateRequestDto.getType())
+                .type(chatCreateRequestDto.getChatType())
                 .build() ;
         Chat finalChat = chat;
         List<ChatParticipant> users = chatCreateRequestDto
@@ -58,7 +58,7 @@ public class ChatServiceImpl implements ChatService{
                             .builder()
                             .joinedAt(LocalDateTime.now())
                             .chat(finalChat)
-                            .chatRole(chatCreateRequestDto.getType() == ChatType.ONE_TO_ONE ? ChatRole.ADMIN : ChatRole.MEMBER)
+                            .chatRole(chatCreateRequestDto.getChatType() == ChatType.ONE_TO_ONE ? ChatRole.ADMIN : ChatRole.MEMBER)
                             .user(userRepository.findById(ele).orElseThrow(() -> new ResourceNotFoundException("User not found with id : "+ele)))
                             .build();
                 })
@@ -69,6 +69,7 @@ public class ChatServiceImpl implements ChatService{
                 .chatRole(ChatRole.ADMIN)
                 .user(user)
                 .chat(chat)
+                .joinedAt(LocalDateTime.now())
                 .build()
         );
         chat.setParticipants(users);

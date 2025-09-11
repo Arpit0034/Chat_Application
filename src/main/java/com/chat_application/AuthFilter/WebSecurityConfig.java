@@ -36,7 +36,12 @@ public class WebSecurityConfig {
                 .sessionManagement(sessionConfig -> sessionConfig.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/users/signup", "/api/v1/users/login", "/api/v1/users/refresh").permitAll()
+                        .requestMatchers(
+                                "/api/v1/users/signup",
+                                "/api/v1/users/login",
+                                "/api/v1/users/refresh"
+                        )
+                        .permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exHandlingConfig -> exHandlingConfig.accessDeniedHandler(accessDeniedHandler())) ;

@@ -38,19 +38,15 @@ public class FriendshipServiceImpl implements FriendshipService{
     @Transactional
     public FriendRequestDto sendFriendRequest(Long friendId) {
         User user = getCurrentUser();
-        log.debug("User {} sending friend request to user {}", user.getId(), friendId);
-
         validateUserIds(user.getId(), friendId);
+        log.debug("User {} sending friend request to user {}", user.getId(), friendId);
 
         User friend = findUserById(friendId);
 
-        Optional<Friendship> existingFriendship = friendshipRepository.findByUser1AndUser2(user, friend)
-                .or(() -> friendshipRepository.findByUser1AndUser2(friend, user));
+        Optional<Friendship> existingFriendship = friendshipRepository.findBidirectionalByUserIds(user.getId(), friend.getId());
 
         if (existingFriendship.isPresent()) {
-            FriendStatus status = existingFriendship.get().getStatus();
-            throw new ResourceNotFoundException(
-                    "Friendship already exists with status: " + status);
+            throw new IllegalArgumentException("Friendship already exists between "+ friend.getName() +" and user " + friend.getName());
         }
 
         Friendship friendship = Friendship.builder()
@@ -71,13 +67,12 @@ public class FriendshipServiceImpl implements FriendshipService{
     @Transactional
     public void acceptFriendRequest(Long requesterId) {
         User user = getCurrentUser();
+        validateUserIds(user.getId(),requesterId);
         log.debug("User {} accepting friend request from user {}", user.getId(), requesterId);
-
 
         User requester = findUserById(requesterId);
 
-        Friendship friendship = friendshipRepository.findByUser1AndUser2(requester, user)
-                .orElseThrow(() -> new ResourceNotFoundException("Friend request not found"));
+        Friendship friendship = findFriendshipBetweenUsers(user,requester) ;
 
         if (friendship.getStatus() != FriendStatus.PENDING) {
             throw new UnAuthorisedException("Friend request is not in pending state");
@@ -94,9 +89,8 @@ public class FriendshipServiceImpl implements FriendshipService{
     @Transactional
     public void removeFriend(Long friendId) {
         User user = getCurrentUser();
-        log.debug("User {} removing friend {}", user.getId(), friendId);
-
         validateUserIds(user.getId(), friendId);
+        log.debug("User {} removing friend {}", user.getId(), friendId);
 
         User friend = findUserById(friendId);
 
@@ -121,14 +115,13 @@ public class FriendshipServiceImpl implements FriendshipService{
     public List<UserSummaryDto> getFriends() {
         User user = getCurrentUser() ;
 
-        List<Friendship> friendships = friendshipRepository.findByUser1OrUser2AndStatus(user, FriendStatus.ACCEPTED);
+        List<Friendship> friendships = friendshipRepository.findByUser1OrUser2AndStatus(user.getId(), FriendStatus.ACCEPTED);
 
         return friendships.stream()
-                .map(friendship -> {
-                    User friend = friendship.getUser1().equals(user) ?
-                            friendship.getUser2() : friendship.getUser1();
-                    return modelMapper.map(friend, UserSummaryDto.class);
-                })
+                .map(friendship -> friendship.getUser1().getId().equals(user.getId())
+                        ? friendship.getUser2()
+                        : friendship.getUser1())
+                .map(friend -> modelMapper.map(friend, UserSummaryDto.class))
                 .collect(Collectors.toList());
     }
 

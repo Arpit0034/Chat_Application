@@ -14,7 +14,9 @@ import com.chat_application.repositories.ChatRepository;
 import com.chat_application.repositories.InvitationRepository;
 import com.chat_application.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +24,7 @@ import java.time.LocalDateTime;
 
 import static com.chat_application.util.AppUtils.getCurrentUser;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class InvitationServiceImpl implements InvitationService{
@@ -30,31 +33,61 @@ public class InvitationServiceImpl implements InvitationService{
     private final InvitationRepository invitationRepository ;
     private final UserRepository userRepository ;
     private final ChatRepository chatRepository ;
+    private final SimpMessagingTemplate simpMessagingTemplate ;
 
+    @Transactional
     @Override
     public InvitationDto sendInvitation(Long receiverId, Long chatId) {
-        User user = getCurrentUser() ;
-        Chat chat = chatRepository.findById(chatId).orElseThrow(() -> new ResourceNotFoundException("Chat not found with id : "+chatId)) ;
-        User receiver = userRepository.findById(receiverId).orElseThrow(() -> new ResourceNotFoundException("User not found with id : "+receiverId)) ;
+        User currentUser = getCurrentUser();
 
-        boolean checkCurrentUser = chat.getParticipants().stream().anyMatch(x ->
-                x.getUser().getId().equals(user.getId())
-                && x.getChatRole().equals(ChatRole.ADMIN)
-        ) && chat.getType().equals(ChatType.GROUP);
+        Chat chat = chatRepository.findById(chatId)
+                .orElseThrow(() -> new ResourceNotFoundException("Chat not found with id: " + chatId));
 
-        boolean checkReceiver = chat.getParticipants().stream().anyMatch(x -> !x.getUser().getId().equals(receiverId)) ;
-        if(!checkCurrentUser && !checkReceiver){
-            throw new UnAuthorisedException("Access Denied for user with id : "+user.getId()) ;
+        User receiver = userRepository.findById(receiverId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + receiverId));
+
+        // ✅ Check that current user is an ADMIN and chat is a GROUP
+        boolean isCurrentUserAdmin = chat.getType() == ChatType.GROUP &&
+                chat.getParticipants().stream()
+                        .anyMatch(p -> p.getUser().getId().equals(currentUser.getId()) &&
+                                p.getChatRole() == ChatRole.ADMIN);
+
+        if (!isCurrentUserAdmin) {
+            throw new UnAuthorisedException("Only chat admins can send invitations.");
         }
-        Invitation invitation = Invitation
-                .builder()
+
+        // ✅ Prevent sending invitation if receiver is already a participant
+        boolean isReceiverAlreadyParticipant = chat.getParticipants().stream()
+                .anyMatch(p -> p.getUser().getId().equals(receiverId));
+
+        if (isReceiverAlreadyParticipant) {
+            throw new IllegalStateException("Receiver is already a participant in this chat.");
+        }
+
+        // ✅ Create and save invitation
+        Invitation invitation = Invitation.builder()
                 .invitationStatus(InvitationStatus.PENDING)
                 .chat(chat)
-                .sender(user)
+                .sender(currentUser)
                 .receiver(receiver)
-                .build() ;
-        return modelMapper.map(invitation,InvitationDto.class) ;
+                .build();
+
+        invitation = invitationRepository.save(invitation);
+
+        InvitationDto invitationDto = modelMapper.map(invitation, InvitationDto.class);
+
+        // ✅ Send invitation over WebSocket to receiver
+        simpMessagingTemplate.convertAndSendToUser(
+                receiver.getUsername(),           // Unique identifier for WebSocket user sessions
+                "/invitations",
+                invitationDto                     // Payload sent to receiver
+        );
+
+        log.info("Invitation sent from user {} to user {} for chat {}", currentUser.getId(), receiverId, chatId);
+
+        return invitationDto;
     }
+
 
     @Transactional
     @Override

@@ -16,7 +16,7 @@ import java.util.List;
 @Builder
 public class ChatCreateRequestDto {
     @NotNull(message = "Chat type is required")
-    private ChatType type;
+    private ChatType chatType;
 
     @Size(max = 100, message = "Chat name cannot exceed 100 characters")
     private String name;
