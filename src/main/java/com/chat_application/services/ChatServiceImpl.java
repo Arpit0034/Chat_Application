@@ -45,6 +45,7 @@ public class ChatServiceImpl implements ChatService{
         if(chatCreateRequestDto.getChatType().equals(ChatType.ONE_TO_ONE) && chatCreateRequestDto.getParticipantIds().size() > 1){
             throw new UnAuthorisedException("Can't add more than 2 participants in chat of type ONE_TO_ONE") ;
         }
+
         Chat chat = Chat.builder()
                 .name(chatCreateRequestDto.getName())
                 .type(chatCreateRequestDto.getChatType())
@@ -141,6 +142,9 @@ public class ChatServiceImpl implements ChatService{
         Chat chat = getById(chatId) ;
         if(checkParticipant(chat, user.getId())){
             throw new AccessDeniedException("User with id : "+user.getId()+" not belong to chat with id :"+chatId) ;
+        }
+        if(chat.getType().equals(ChatType.ONE_TO_ONE)){
+            throw  new AccessDeniedException("Can't leave ONE_TO_ONE chat") ;
         }
         ChatParticipant chatParticipant = chat
                 .getParticipants()

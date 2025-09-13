@@ -2,12 +2,9 @@ package com.chat_application.services;
 
 import com.chat_application.dto.*;
 import com.chat_application.entity.*;
-import com.chat_application.entity.enums.MessageStatus;
+import com.chat_application.entity.enums.*;
 import com.chat_application.exception.ResourceNotFoundException;
-import com.chat_application.repositories.AttachmentRepository;
-import com.chat_application.repositories.ChatRepository;
-import com.chat_application.repositories.MessageReadRepository;
-import com.chat_application.repositories.MessageRepository;
+import com.chat_application.repositories.*;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
@@ -33,9 +30,8 @@ public class MessageServiceImpl implements MessageService {
     private final ModelMapper modelMapper;
     private final MessageRepository messageRepository;
     private final ChatRepository chatRepository;
-    private final AttachmentRepository attachmentRepository;
-    private final MessageReadRepository messageReadRepository;
     private final SimpMessagingTemplate simpMessagingTemplate;
+    private final FriendshipRepository friendshipRepository ;
 
     @Transactional
     @Override
@@ -44,7 +40,31 @@ public class MessageServiceImpl implements MessageService {
 
         Chat chat = chatRepository.findById(dto.getChatId())
                 .orElseThrow(() -> new ResourceNotFoundException("Chat not found with id: " + dto.getChatId()));
+        if (chat.getType().equals(ChatType.ONE_TO_ONE)) {
+            List<ChatParticipant> participants = chat.getParticipants();
+            if (participants.size() != 2) {
+                throw new IllegalStateException("ONE_TO_ONE chat should have exactly 2 participants");
+            }
 
+            User user1 = participants.get(0).getUser();
+            User user2 = participants.get(1).getUser();
+
+            User otherUser = user1.equals(currentUser) ? user2 : user1;
+
+            boolean isBlocked = friendshipRepository.findByUser1AndUser2(otherUser, currentUser)
+                    .map(f -> f.getStatus().equals(FriendStatus.BLOCKED))
+                    .orElse(false);
+
+            if (!isBlocked) {
+                isBlocked = friendshipRepository.findByUser2AndUser1(otherUser, currentUser)
+                        .map(f -> f.getStatus().equals(FriendStatus.BLOCKED))
+                        .orElse(false);
+            }
+
+            if (isBlocked) {
+                throw new AccessDeniedException("Can't create message - you are blocked by this user.");
+            }
+        }
         Message message = new Message();
         message.setChat(chat);
         message.setSender(currentUser);
@@ -65,8 +85,11 @@ public class MessageServiceImpl implements MessageService {
         Message savedMessage = messageRepository.save(message);
         MessageSummaryDto messageSummaryDto = modelMapper.map(savedMessage,MessageSummaryDto.class) ;
         simpMessagingTemplate.convertAndSend("/topic/chat/"+chat.getId(),messageSummaryDto);
+
         return messageSummaryDto ;
     }
+
+
 
     @Override
     public PagedResponseDto<MessageSummaryDto> getChatMessages(Long chatId, int page, int size) {
@@ -109,6 +132,7 @@ public class MessageServiceImpl implements MessageService {
         }
 
         messageRepository.save(message);
+        messageRepository.flush();
     }
 
     @Transactional
@@ -121,6 +145,9 @@ public class MessageServiceImpl implements MessageService {
 
         if (!message.getSender().getId().equals(currentUser.getId())) {
             throw new AccessDeniedException("Only sender can delete message for everyone.");
+        }
+        if(message.getSenderMessageStatus().equals(MessageStatus.DELETE_FOR_ME)){
+            throw new AccessDeniedException("Can't delete message") ;
         }
         messageRepository.delete(message);
     }
@@ -141,5 +168,21 @@ public class MessageServiceImpl implements MessageService {
         }
 
         messageRepository.saveAll(messages);
+        messageRepository.flush();
+    }
+
+    @Override
+    public void markMessageAsDelivered(Long messageId) {
+        User user = getCurrentUser() ;
+        Message message = messageRepository.findById(messageId).orElseThrow(() -> new ResourceNotFoundException("Message not found with id : "+messageId)) ;
+        if(message.getSender().getId().equals(user.getId())){
+            throw new AccessDeniedException("Not authorize to do this operation") ;
+        }
+        boolean isReceiver = message.getChat().getParticipants().stream().anyMatch(x -> x.getUser().getId().equals(user.getId())) ;
+        if(!isReceiver){
+            throw new AccessDeniedException("Not authorize to perform this operation") ;
+        }
+        message.setSendStatus(MessageSendStatus.DELIVERED);
+        messageRepository.save(message) ;
     }
 }

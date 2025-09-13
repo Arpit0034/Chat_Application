@@ -24,6 +24,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -52,15 +53,31 @@ public class UserServiceImpl implements UserService , UserDetailsService {
     @Override
     @Transactional
     public UserDto updateUser(UserUpdateRequestDto userUpdateRequestDto) {
-        User user = getCurrentUser();
-        log.debug("Updating user with id: {}", user.getId());
+            User user = getCurrentUser();
+            log.debug("Updating user with id: {}", user.getId());
 
-        modelMapper.map(userUpdateRequestDto, user);
+            for (Field field : userUpdateRequestDto.getClass().getDeclaredFields()) {
+                field.setAccessible(true);
+                try {
+                    Object value = field.get(userUpdateRequestDto);
+                    if (value != null) {
+                        try {
+                            Field targetField = user.getClass().getDeclaredField(field.getName());
+                            targetField.setAccessible(true);
+                            targetField.set(user, value);
+                        } catch (NoSuchFieldException ignored) {
 
-        User updatedUser = userRepository.save(user);
-        log.info("Successfully updated user with id: {}", user.getId());
+                        }
+                    }
+                } catch (IllegalAccessException e) {
+                    throw new RuntimeException("Error copying property: " + field.getName(), e);
+                }
+            }
 
-        return modelMapper.map(updatedUser, UserDto.class);
+            User updatedUser = userRepository.save(user);
+            log.info("Successfully updated user with id: {}", updatedUser.getId());
+
+            return modelMapper.map(updatedUser, UserDto.class);
     }
 
     @Transactional

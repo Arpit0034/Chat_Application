@@ -27,8 +27,8 @@ public class ChatController {
     }
 
     @GetMapping("/getChatByName/{chatName}")
-    public ResponseEntity<List<ChatSummaryDto>> getChatByName(@PathVariable String name){
-        return new ResponseEntity<>(chatService.getChatByName(name),HttpStatus.FOUND) ;
+    public ResponseEntity<List<ChatSummaryDto>> getChatByName(@PathVariable String chatName){
+        return new ResponseEntity<>(chatService.getChatByName(chatName),HttpStatus.FOUND) ;
     }
 
     @GetMapping("/getAllChats/{page}/{size}")

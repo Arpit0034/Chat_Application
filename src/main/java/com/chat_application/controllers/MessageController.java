@@ -7,6 +7,7 @@ import com.chat_application.dto.MessageSummaryDto;
 import com.chat_application.services.MessageService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -43,7 +44,13 @@ public class MessageController {
     }
 
     @GetMapping("/getChat/{chatId}/{page}/{size}")
-    public ResponseEntity<?> getMessage(@Positive @PathVariable Long chatId ,@Positive @PathVariable int page ,@Positive @PathVariable int size){
+    public ResponseEntity<?> getMessage(@Positive @PathVariable Long chatId , @PositiveOrZero @PathVariable int page , @Positive @PathVariable int size){
         return new ResponseEntity<>(messageService.getChatMessages(chatId,page,size),HttpStatus.FOUND) ;
+    }
+
+    @PatchMapping("/markMessageDelivered/{messageId}")
+    public ResponseEntity<Void> markMessageDelivered(@Positive @PathVariable Long messageId){
+        messageService.markMessageAsDelivered(messageId) ;
+        return ResponseEntity.noContent().build() ;
     }
 }

@@ -10,4 +10,5 @@ public interface MessageService {
     public void deleteMessageForMe(Long messageId) ;
     public void deleteMessageForEveryone(Long messageId) ;
     void deleteAllMessages(Long chatId);
+    void markMessageAsDelivered(Long messageId) ;
 }

@@ -18,8 +18,8 @@ public class NotificationController {
     private final NotificationService notificationService ;
 
     @PostMapping("/createNotification/{chatId}/{messageId}/{type}")
-    public ResponseEntity<NotificationDto> createNotification(@Positive @PathVariable Long chatId ,@Positive @PathVariable Long messageId, @PathVariable NotificationType notificationType){
-        return new ResponseEntity<>(notificationService.createNotification(chatId,messageId,notificationType), HttpStatus.CREATED) ;
+    public ResponseEntity<NotificationDto> createNotification(@Positive @PathVariable Long chatId ,@Positive @PathVariable Long messageId, @PathVariable NotificationType type){
+        return new ResponseEntity<>(notificationService.createNotification(chatId,messageId,type), HttpStatus.CREATED) ;
     }
 
     @GetMapping("/getNotifications/{page}/{size}")
