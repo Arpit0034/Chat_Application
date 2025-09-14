@@ -1,26 +1,25 @@
 package com.chat_application.dto;
 
-import com.chat_application.entity.Chat;
-import com.chat_application.entity.User;
 import com.chat_application.entity.enums.InvitationStatus;
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
 @Data
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class InvitationDto {
     private Long id;
-    private Chat chat;
-    private User sender;
-    private User receiver;
+    private Long chatId;
+    private String chatName;
+    private Long senderId;
+    private String senderName;
+    private Long receiverId;
+    private String receiverName;
     private InvitationStatus invitationStatus;
     private LocalDateTime createdAt;
     private LocalDateTime respondedAt;

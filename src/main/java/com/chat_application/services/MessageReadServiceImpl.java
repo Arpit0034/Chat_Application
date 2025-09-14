@@ -67,14 +67,14 @@ public class MessageReadServiceImpl implements MessageReadService {
         if (!MessageSendStatus.DELIVERED.equals(message.getSendStatus())) {
             throw new AccessDeniedException("Cannot access users list before message is delivered");
         }
-
+        
         boolean isSender = message.getSender().getId().equals(user.getId());
-        boolean canView = !isSender && message.getReceiverMessageStatus() == MessageStatus.VISIBLE;
-
-        if (!canView) {
-            throw new AccessDeniedException("Message is deleted for you, cannot get users list");
+        if (!isSender) {
+            throw new AccessDeniedException("Only sender can access the users list who read the message");
         }
-
+        if(message.getSenderMessageStatus().equals(MessageStatus.DELETE_FOR_ME)){
+            throw new AccessDeniedException("Cannot perform this operation") ;
+        }
         List<MessageRead> messageReads = message.getMessageReads();
         return messageReads.stream()
                 .map(mr -> modelMapper.map(mr.getUser(), UserSummaryDto.class))
@@ -92,10 +92,11 @@ public class MessageReadServiceImpl implements MessageReadService {
         }
 
         boolean isSender = message.getSender().getId().equals(user.getId());
-        boolean canView = isSender && message.getSenderMessageStatus()== MessageStatus.VISIBLE;
-
-        if (!canView) {
-            throw new AccessDeniedException("Message is deleted for you, cannot get unread user count");
+        if (!isSender) {
+            throw new AccessDeniedException("Only sender can access count of users");
+        }
+        if(message.getSenderMessageStatus().equals(MessageStatus.DELETE_FOR_ME)){
+            throw new AccessDeniedException("Cannot perform this operation") ;
         }
 
         Chat chat = message.getChat();
@@ -114,7 +115,7 @@ public class MessageReadServiceImpl implements MessageReadService {
 
     @Override
     public boolean hasUserReadMessage(Long messageId, Long userId) {
-        User currentUser = getCurrentUser();
+        User user = getCurrentUser();
         Message message = messageRepository.findById(messageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + messageId));
 
@@ -122,11 +123,12 @@ public class MessageReadServiceImpl implements MessageReadService {
             throw new AccessDeniedException("Cannot access read status before message is delivered");
         }
 
-        boolean isSender = message.getSender().getId().equals(currentUser.getId());
-        boolean canView = isSender && message.getReceiverMessageStatus() == MessageStatus.VISIBLE ;
-
-        if (!canView) {
-            throw new AccessDeniedException("Message is deleted for you, cannot check read status");
+        boolean isSender = message.getSender().getId().equals(user.getId());
+        if (!isSender) {
+            throw new AccessDeniedException("Only sender can perform this operation");
+        }
+        if(message.getSenderMessageStatus().equals(MessageStatus.DELETE_FOR_ME)){
+            throw new AccessDeniedException("Cannot perform this operation") ;
         }
 
         return message.getMessageReads().stream()

@@ -1,16 +1,13 @@
 package com.chat_application.services;
 
+import com.chat_application.dto.NotificationCreateDto;
 import com.chat_application.dto.NotificationDto;
 import com.chat_application.dto.NotificationSummaryDto;
-import com.chat_application.entity.Chat;
-import com.chat_application.entity.Message;
-import com.chat_application.entity.Notification;
-import com.chat_application.entity.User;
+import com.chat_application.entity.*;
+import com.chat_application.entity.enums.ChatRole;
 import com.chat_application.entity.enums.NotificationType;
 import com.chat_application.exception.ResourceNotFoundException;
-import com.chat_application.repositories.ChatRepository;
-import com.chat_application.repositories.MessageRepository;
-import com.chat_application.repositories.NotificationRepository;
+import com.chat_application.repositories.*;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
@@ -23,9 +20,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static com.chat_application.util.AppUtils.getCurrentUser;
-import static java.util.stream.Collectors.toList;
 
 @Service
 @RequiredArgsConstructor
@@ -34,27 +32,120 @@ public class NotificationServiceImpl implements NotificationService{
     private final ModelMapper modelMapper ;
     private final ChatRepository chatRepository ;
     private final NotificationRepository notificationRepository ;
-    private final MessageRepository messageReadRepository ;
+    private final MessageRepository messageRepository ;
     private final SimpMessagingTemplate simpMessagingTemplate ;
+    private final UserRepository userRepository ;
+    private final FriendshipRepository friendshipRepository ;
 
     @Transactional
     @Override
-    public NotificationDto createNotification(Long chatId, Long messageId, NotificationType type) {
-        User user = getCurrentUser() ;
-        Chat chat = chatRepository.findById(chatId).orElseThrow(() -> new ResourceNotFoundException("Chat not found with id: "+chatId)) ;
-        Message message = messageReadRepository.findById(messageId).orElseThrow(() -> new ResourceNotFoundException("Message not found with id: "+messageId)) ;
-        Notification notification = Notification.builder()
-                .user(user)
-                .chat(chat)
-                .isRead(false)
-                .message(message)
-                .type(type)
-                .build() ;
-        notificationRepository.save(notification) ;
-        NotificationDto notificationDto = modelMapper.map(notification,NotificationDto.class) ;
-        simpMessagingTemplate.convertAndSend("/topic/chat/" + chatId + "/notifications",notificationDto);
-        return notificationDto ;
+    public NotificationDto createNotification(NotificationCreateDto createNotificationDto) {
+        User currentUser = getCurrentUser();
+
+        if (createNotificationDto.getType().equals(NotificationType.NEW_MESSAGE)) {
+            Chat chat = chatRepository.findById(createNotificationDto.getChatId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Chat not found with id: " + createNotificationDto.getChatId()));
+
+            boolean checkMessage = chat.getMessages().stream()
+                    .anyMatch(x -> x.getId().equals(createNotificationDto.getMessageId()));
+            if (!checkMessage) {
+                throw new AccessDeniedException("Message is not part of chat");
+            }
+
+            Message message = messageRepository.findById(createNotificationDto.getMessageId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + createNotificationDto.getMessageId()));
+
+            if (!message.getSender().getId().equals(currentUser.getId())) {
+                throw new AccessDeniedException("Can't create notification");
+            }
+
+            List<User> recipients = chat.getParticipants().stream()
+                    .map(ChatParticipant::getUser)
+                    .filter(user -> !user.getId().equals(currentUser.getId()))
+                    .toList();
+
+            for (User recipient : recipients) {
+                Notification notification = Notification.builder()
+                        .type(NotificationType.NEW_MESSAGE)
+                        .message(message)
+                        .isRead(false)
+                        .chat(chat)
+                        .user(recipient)
+                        .content(null)
+                        .build();
+
+                notificationRepository.save(notification);
+                NotificationDto notificationDto = modelMapper.map(notification, NotificationDto.class);
+                simpMessagingTemplate.convertAndSend("/topic/user/" + recipient.getId() + "/notifications", notificationDto);
+            }
+
+            return recipients.isEmpty() ? null : modelMapper.map(
+                    notificationRepository.findTopByTypeAndMessageIdOrderByCreatedAtDesc(NotificationType.NEW_MESSAGE, message.getId()),
+                    NotificationDto.class);
+        }
+
+        if (createNotificationDto.getType().equals(NotificationType.GROUP_INVITE)) {
+            Chat chat = chatRepository.findById(createNotificationDto.getChatId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Chat not found with id: " + createNotificationDto.getChatId()));
+
+            boolean isAdmin = chat.getParticipants().stream()
+                    .anyMatch(x -> x.getUser().getId().equals(currentUser.getId()) && x.getChatRole().equals(ChatRole.ADMIN));
+            if (!isAdmin) {
+                throw new AccessDeniedException("Can't create notification");
+            }
+
+            User receiver = userRepository.findById(createNotificationDto.getUserId())
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + createNotificationDto.getUserId()));
+
+            boolean isPartOfChat = chat.getParticipants().stream()
+                    .anyMatch(x -> x.getUser().getId().equals(receiver.getId()));
+            if (isPartOfChat) {
+                throw new AccessDeniedException("Can't send group invite request");
+            }
+
+            Notification notification = Notification.builder()
+                    .content("You have been invited to join group " + chat.getName())
+                    .chat(chat)
+                    .message(null)
+                    .user(receiver)
+                    .type(NotificationType.GROUP_INVITE)
+                    .isRead(false)
+                    .build();
+
+            notificationRepository.save(notification);
+            NotificationDto notificationDto = modelMapper.map(notification, NotificationDto.class);
+            simpMessagingTemplate.convertAndSend("/topic/user/" + receiver.getId() + "/notifications", notificationDto);
+            return notificationDto;
+        }
+
+        if (createNotificationDto.getType().equals(NotificationType.FRIEND_REQUEST)) {
+            User receiver = userRepository.findById(createNotificationDto.getUserId())
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + createNotificationDto.getUserId()));
+
+            // Check if friendship already exists or request is pending
+            Optional<Friendship> existingFriendship = friendshipRepository.findByUser1AndUser2(currentUser, receiver);
+            if (existingFriendship.isPresent()) {
+                throw new AccessDeniedException("Friendship request already exists or users are already friends");
+            }
+
+            Notification notification = Notification.builder()
+                    .content(currentUser.getName() + " sent you a friend request")
+                    .chat(null)
+                    .message(null)
+                    .user(receiver)
+                    .type(NotificationType.FRIEND_REQUEST)
+                    .isRead(false)
+                    .build();
+
+            notificationRepository.save(notification);
+            NotificationDto notificationDto = modelMapper.map(notification, NotificationDto.class);
+            simpMessagingTemplate.convertAndSend("/topic/user/" + receiver.getId() + "/notifications", notificationDto);
+            return notificationDto;
+        }
+
+        throw new IllegalArgumentException("Unsupported notification type: " + createNotificationDto.getType());
     }
+
 
     @Override
     public List<NotificationSummaryDto> getNotificationsForUser(int page, int size) {
@@ -69,6 +160,7 @@ public class NotificationServiceImpl implements NotificationService{
                 .toList() ;
     }
 
+    @Transactional
     @Override
     public void markAsRead(Long notificationId) {
         User user = getCurrentUser() ;
@@ -88,7 +180,7 @@ public class NotificationServiceImpl implements NotificationService{
         if(!notification.getUser().getId().equals(user.getId())){
             throw new AccessDeniedException("Notification with id : "+notificationId+" not belong to user with id: "+user.getId()) ;
         }
-        notificationRepository.delete(notification); ;
+        notificationRepository.delete(notification);
     }
 
     @Transactional

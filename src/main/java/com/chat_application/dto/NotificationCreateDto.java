@@ -12,14 +12,20 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class NotificationDto {
-    private Long id;
-    private Long userId;
-    private ChatSummaryDto chat;
-    private MessageSummaryDto message;
-    private NotificationType type;
-    private String content ;
-    private Boolean isRead;
-    private LocalDateTime createdAt;
-}
+public class NotificationCreateDto {
 
+    private Long userId;
+
+    private Long chatId;
+
+    private Long messageId;
+
+    private NotificationType type;
+
+    private Boolean isRead;
+
+    private String content;
+
+    private LocalDateTime createdAt;
+
+}

@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,11 +47,15 @@ public class InvitationServiceImpl implements InvitationService{
         User receiver = userRepository.findById(receiverId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + receiverId));
 
+        if(chat.getType().equals(ChatType.ONE_TO_ONE)){
+            throw new AccessDeniedException("Can't send invitation to ONE_TO_ONE chat") ;
+        }
         // ✅ Check that current user is an ADMIN and chat is a GROUP
-        boolean isCurrentUserAdmin = chat.getType() == ChatType.GROUP &&
+        boolean isCurrentUserAdmin =
                 chat.getParticipants().stream()
                         .anyMatch(p -> p.getUser().getId().equals(currentUser.getId()) &&
                                 p.getChatRole() == ChatRole.ADMIN);
+
 
         if (!isCurrentUserAdmin) {
             throw new UnAuthorisedException("Only chat admins can send invitations.");
@@ -74,18 +79,29 @@ public class InvitationServiceImpl implements InvitationService{
 
         invitation = invitationRepository.save(invitation);
 
-        InvitationDto invitationDto = modelMapper.map(invitation, InvitationDto.class);
+        InvitationDto dto = InvitationDto.builder()
+                .id(invitation.getId())
+                .chatId(invitation.getChat().getId())
+                .chatName(invitation.getChat().getName())
+                .senderId(invitation.getSender().getId())
+                .senderName(invitation.getSender().getName())
+                .receiverId(invitation.getReceiver().getId())
+                .receiverName(invitation.getReceiver().getName())
+                .invitationStatus(invitation.getInvitationStatus())
+                .createdAt(invitation.getCreatedAt())
+                .respondedAt(invitation.getRespondedAt())
+                .build();
 
-        // ✅ Send invitation over WebSocket to receiver
+// send this flat DTO over WebSocket
         simpMessagingTemplate.convertAndSendToUser(
-                receiver.getUsername(),           // Unique identifier for WebSocket user sessions
+                invitation.getReceiver().getUsername(),
                 "/invitations",
-                invitationDto                     // Payload sent to receiver
+                dto
         );
 
         log.info("Invitation sent from user {} to user {} for chat {}", currentUser.getId(), receiverId, chatId);
 
-        return invitationDto;
+        return dto;
     }
 
 
@@ -102,6 +118,10 @@ public class InvitationServiceImpl implements InvitationService{
         Chat chat = invitation.getChat();
         if (chat == null) {
             throw new ResourceNotFoundException("Chat not found for invitation: " + invitationId);
+        }
+
+        if(chat.getType().equals(ChatType.ONE_TO_ONE)){
+            throw new AccessDeniedException("Can't perform this operation") ;
         }
 
         // 2. Ensure the current user is the receiver
@@ -129,6 +149,7 @@ public class InvitationServiceImpl implements InvitationService{
 
         invitation = invitationRepository.save(invitation);
         chatRepository.save(chat);
+        chatRepository.flush();
 
         return modelMapper.map(invitation, InvitationDto.class);
     }

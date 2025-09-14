@@ -35,6 +35,8 @@ public class Notification {
     @Enumerated(EnumType.STRING)
     private NotificationType type;
 
+    private String content ;
+
     private Boolean isRead;
 
     @CreationTimestamp

@@ -1,5 +1,6 @@
 package com.chat_application.controllers;
 
+import com.chat_application.dto.NotificationCreateDto;
 import com.chat_application.dto.NotificationDto;
 import com.chat_application.dto.NotificationSummaryDto;
 import com.chat_application.entity.enums.NotificationType;
@@ -13,13 +14,14 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
+@RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
 public class NotificationController {
     private final NotificationService notificationService ;
 
-    @PostMapping("/createNotification/{chatId}/{messageId}/{type}")
-    public ResponseEntity<NotificationDto> createNotification(@Positive @PathVariable Long chatId ,@Positive @PathVariable Long messageId, @PathVariable NotificationType type){
-        return new ResponseEntity<>(notificationService.createNotification(chatId,messageId,type), HttpStatus.CREATED) ;
+    @PostMapping("/createNotification/")
+    public ResponseEntity<NotificationDto> createNotification(@RequestBody NotificationCreateDto notificationCreateDto){
+        return new ResponseEntity<>(notificationService.createNotification(notificationCreateDto), HttpStatus.CREATED) ;
     }
 
     @GetMapping("/getNotifications/{page}/{size}")
